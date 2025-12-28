@@ -76,6 +76,10 @@
     { name: 'TI', semis: 11 },
   ];
 
+  const ISSUE_REPO = 'dfielding14/solfege-flight';
+  const ISSUE_LABELS = ['glitch-report'];
+  const REPORT_LIMIT = 10;
+
   // Name -> lane index
   const NAME_TO_LANE = Object.create(null);
   for (let i = 0; i < SOLFEGE.length; i++) NAME_TO_LANE[SOLFEGE[i].name] = i;
@@ -1027,6 +1031,15 @@
         typeof v === 'number' && Number.isFinite(v) ? Number(v.toFixed(digits)) : v
       );
 
+      const obstaclesSample = this.obstacles.slice(-12).map(o => ({
+        x: round(o.x, 1),
+        w: round(o.w, 1),
+        lane: o.lane,
+        gapTop: round(o.gapTop, 1),
+        gapBottom: round(o.gapBottom, 1),
+        passed: o.passed,
+      }));
+
       const report = {
         time: new Date().toISOString(),
         reason,
@@ -1059,14 +1072,8 @@
           scaleFreqs: this.scaleFreqs ? this.scaleFreqs.map(f => round(f, 2)) : null,
           scaleBounds: this.scaleBounds ? this.scaleBounds.map(v => round(v, 2)) : null,
         },
-        obstacles: this.obstacles.map(o => ({
-          x: round(o.x, 1),
-          w: round(o.w, 1),
-          lane: o.lane,
-          gapTop: round(o.gapTop, 1),
-          gapBottom: round(o.gapBottom, 1),
-          passed: o.passed,
-        })),
+        obstaclesTotal: this.obstacles.length,
+        obstaclesSample,
         audio: this.audio && this.audio.latest ? {
           freq: round(this.audio.latest.freq, 2),
           rms: round(this.audio.latest.rms, 4),
@@ -1079,12 +1086,50 @@
           staffBottom: round(this.staffBottom, 1),
           laneStep: round(this.laneStep, 2),
         },
+        page: window.location.href,
+        userAgent: navigator.userAgent,
       };
 
+      this._storeReport(report);
+      console.warn('[Solfege Flight] Report', report);
+      this._openIssue(report);
+      return report;
+    }
+
+    _storeReport(report) {
       if (!window.__solfegeReports) window.__solfegeReports = [];
       window.__solfegeReports.push(report);
-      console.warn('[Solfege Flight] Report', report);
-      return report;
+      while (window.__solfegeReports.length > REPORT_LIMIT) window.__solfegeReports.shift();
+
+      try {
+        const key = 'solfegeFlightReports';
+        const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        const next = [...existing, report].slice(-REPORT_LIMIT);
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch (err) {
+        console.warn('[Solfege Flight] Report storage failed', err);
+      }
+    }
+
+    _buildIssueUrl(report) {
+      const title = `Glitch report: ${report.levelTitle || 'Unknown'} (${report.time})`;
+      const bodyLines = [
+        'Auto-generated report from Solfege Flight.',
+        '',
+        '```json',
+        JSON.stringify(report),
+        '```',
+      ];
+      const params = new URLSearchParams();
+      params.set('title', title);
+      params.set('body', bodyLines.join('\\n'));
+      if (ISSUE_LABELS.length) params.set('labels', ISSUE_LABELS.join(','));
+      return `https://github.com/${ISSUE_REPO}/issues/new?${params.toString()}`;
+    }
+
+    _openIssue(report) {
+      const url = this._buildIssueUrl(report);
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
 
     /********************
