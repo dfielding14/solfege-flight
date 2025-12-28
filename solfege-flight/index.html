@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Solfege Flight</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Space+Grotesk:wght@400;500;600&display=swap"
+  />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="game" aria-label="Solfege Flight game canvas"></canvas>
+
+  <div id="ui">
+    <div id="screen-menu" class="screen">
+      <h1>Solfege Flight</h1>
+      <p>
+        Sing <b>Do-Re-Mi-Fa-Sol-La-Ti</b> to move the note on the staff.
+        The game guides you through a tuner-style calibration so higher pitch goes up.
+      </p>
+
+      <div class="row">
+        <label class="opt">
+          <span class="label">Level:</span>
+          <select id="level-select"></select>
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="opt">
+          <span class="label">Speed:</span>
+          <input id="speed-slider" type="range" min="1" max="10" step="1" value="1" />
+          <span id="speed-value" class="small">1x</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="opt">
+          <span class="label">Pitch leniency:</span>
+          <input id="difficulty-slider" type="range" min="40" max="140" step="5" value="90" />
+          <span id="difficulty-value" class="small">±90c</span>
+        </label>
+      </div>
+
+      <p id="level-desc" class="small"></p>
+
+      <div class="row">
+        <button id="btn-start">Start (Tutorial + Calibration)</button>
+        <button id="btn-keyboard" class="secondary">Play with Keyboard</button>
+      </div>
+
+      <p class="small">
+        Mic audio is processed locally in your browser. Nothing is uploaded.
+        Headphones help if you use reference tones.
+      </p>
+
+      <p id="menu-error" class="error hidden"></p>
+    </div>
+
+    <div id="screen-wizard" class="screen hidden">
+      <div class="wizard-head">
+        <h2 id="wiz-title">Tutorial + Calibration</h2>
+        <div id="wiz-step" class="small">Step --</div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <h3>Live microphone analysis</h3>
+
+          <div class="kv">
+            <div><span class="label">Pitch:</span> <span id="live-freq">--</span></div>
+            <div><span class="label">Closest note:</span> <span id="live-note">--</span></div>
+          </div>
+
+          <div class="kv">
+            <div><span class="label">Clarity:</span> <span id="live-clarity">--</span></div>
+            <div><span class="label">Volume:</span> <span id="live-volume">--</span></div>
+          </div>
+
+          <div class="gauge">
+            <div class="gauge-center"></div>
+            <div id="gauge-needle" class="gauge-needle"></div>
+          </div>
+          <div class="kv">
+            <div><span class="label">Offset:</span> <span id="live-cents">--</span></div>
+            <div><span class="label">Detected solfege:</span> <span id="live-solfege">--</span></div>
+          </div>
+
+          <div class="small muted">
+            Tip: a steady vowel like "doo" or "ah" works better than consonants.
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 id="wiz-step-title">--</h3>
+          <p id="wiz-text">--</p>
+
+          <div id="wiz-mode" class="row hidden">
+            <button id="btn-mode-c">Try to match C first (tuner-style)</button>
+            <button id="btn-mode-do" class="secondary">Use any comfortable "Do"</button>
+          </div>
+
+          <div id="wiz-target" class="target hidden">
+            <div class="kv">
+              <div><span class="label">Target:</span> <span id="target-label">--</span></div>
+              <div><span class="label">Hold:</span> <span id="hold-status">--</span></div>
+            </div>
+
+            <div class="row">
+              <button id="btn-tone" class="secondary">Play reference tone</button>
+              <button id="btn-tone2" class="secondary hidden">Play (alt octave)</button>
+            </div>
+
+            <div class="meter">
+              <div id="hold-bar" class="meter-bar"></div>
+            </div>
+
+            <p id="target-hint" class="small muted"></p>
+          </div>
+
+          <div id="wiz-checklist" class="hidden">
+            <p class="small muted">
+              Scale checklist: try to make each one light up once.
+            </p>
+            <div id="checkgrid" class="checkgrid"></div>
+          </div>
+
+          <p id="wiz-error" class="error hidden"></p>
+
+          <div class="row">
+            <button id="btn-wiz-back" class="secondary">Back</button>
+            <button id="btn-wiz-next">Next</button>
+            <button id="btn-wiz-skip" class="secondary">Skip text</button>
+          </div>
+
+          <p class="small muted">
+            Reference tones can leak into the mic if you use speakers. Headphones are best.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div id="hud" class="hud hidden">
+      <div class="hud-row">
+        <div><span class="label">Level:</span> <span id="hud-level">--</span></div>
+        <div><span class="label">Progress:</span> <span id="hud-progress">0/0</span></div>
+        <div><span class="label">Next:</span> <span id="hud-next">--</span></div>
+      </div>
+
+      <div class="hud-row">
+        <div>
+          <span class="label">You:</span> <span id="hud-you">--</span>
+          <span id="hud-tune" class="small"></span>
+        </div>
+
+        <div class="mic">
+          <span class="label">Mic:</span>
+          <div class="meter slim"><div id="mic-bar" class="meter-bar"></div></div>
+        </div>
+
+        <button id="btn-pause" class="secondary smallbtn">Pause</button>
+        <button id="btn-report" class="secondary smallbtn">Report Glitch</button>
+      </div>
+    </div>
+
+    <div id="screen-paused" class="screen hidden">
+      <h2>Paused</h2>
+      <div class="row">
+        <button id="btn-resume">Resume</button>
+        <button id="btn-restart" class="secondary">Restart Level</button>
+        <button id="btn-menu" class="secondary">Back to Menu</button>
+        <button id="btn-report-paused" class="secondary">Report Glitch</button>
+      </div>
+      <p class="small">Keyboard: Up/Down to move. Esc toggles pause.</p>
+    </div>
+
+    <div id="screen-complete" class="screen hidden">
+      <h2 id="complete-title">Level Complete!</h2>
+      <p id="complete-stats" class="small"></p>
+      <div class="row">
+        <button id="btn-nextlevel">Next Level</button>
+        <button id="btn-replay" class="secondary">Replay Level</button>
+        <button id="btn-complete-menu" class="secondary">Back to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
