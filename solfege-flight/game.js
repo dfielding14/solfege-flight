@@ -670,18 +670,18 @@
       const slider = this.ui.speedSlider;
       if (!slider) return;
       const parsed = parseFloat(slider.value);
-      this.speedScale = Number.isFinite(parsed) ? parsed : 1;
+      this.speedScale = Number.isFinite(parsed) ? parsed / 100 : 1;
       this._updateSpeedLabel();
       slider.addEventListener('input', () => {
         const next = parseFloat(slider.value);
-        this.speedScale = Number.isFinite(next) ? next : 1;
+        this.speedScale = Number.isFinite(next) ? next / 100 : 1;
         this._updateSpeedLabel();
       });
     }
 
     _updateSpeedLabel() {
       if (!this.ui.speedValue) return;
-      this.ui.speedValue.textContent = `${Math.round(this.speedScale)}x`;
+      this.ui.speedValue.textContent = `${Math.round(this.speedScale * 100)}%`;
     }
 
     _initDifficultyControl() {
@@ -722,12 +722,14 @@
         await this._startMicAndWizard();
       });
 
-      $('#btn-keyboard').addEventListener('click', () => {
-        this.keyboardOnly = true;
-        this._resetCalibrationData();
-        const idx = parseInt(this.ui.levelSelect.value, 10) || 0;
-        this.beginLevel(idx);
-      });
+      const btnStartSkip = $('#btn-start-skip');
+      if (btnStartSkip) {
+        btnStartSkip.addEventListener('click', async () => {
+          this.keyboardOnly = false;
+          this.pendingLevelIndex = parseInt(this.ui.levelSelect.value, 10) || 0;
+          await this._startMicAndSkip();
+        });
+      }
 
       $('#btn-pause').addEventListener('click', () => {
         if (this.state === 'play') this._enterPaused();
@@ -843,7 +845,26 @@
       } catch (err) {
         console.error(err);
         this._setMenuError(
-          'Microphone access failed. You can try again, or use "Play with Keyboard". ' +
+          'Microphone access failed. You can try again. ' +
+          (err && err.message ? `(${err.message})` : '')
+        );
+      }
+    }
+
+    async _startMicAndSkip() {
+      try {
+        this._setMenuError('');
+        await this.audio.start();
+        this.tone = new TonePlayer(this.audio.audioCtx);
+        this._resetCalibrationData();
+        this.doFreqHz = 261.625565;
+        this.scaleFreqs = buildScaleFromDo(this.doFreqHz);
+        this.scaleBounds = buildBounds(this.scaleFreqs);
+        this.beginLevel(this.pendingLevelIndex);
+      } catch (err) {
+        console.error(err);
+        this._setMenuError(
+          'Microphone access failed. You can try again. ' +
           (err && err.message ? `(${err.message})` : '')
         );
       }
@@ -977,7 +998,7 @@
     }
 
     getSpawnTimeScale() {
-      const scale = clamp(this.speedScale || 1, 1, 10);
+      const scale = clamp(this.speedScale || 1, 1, 2);
       return 1 / scale;
     }
 
@@ -1470,7 +1491,8 @@
       const baseSpeed = this.getScrollSpeed();
       let speed = baseSpeed;
 
-      if (this.bounceTimer > 0) {
+      const wasBouncing = this.bounceTimer > 0;
+      if (wasBouncing) {
         this.bounceTimer -= dt;
         speed = -baseSpeed * CONFIG.bounceSpeedFactor;
       }
@@ -1521,27 +1543,29 @@
           this.clearedCount++;
         }
 
-        const px = this.player.x, py = this.player.y;
-        const left = px - this.player.halfW;
-        const right = px + this.player.halfW;
-        const top = py - this.player.halfH;
-        const bottom = py + this.player.halfH;
+        if (!wasBouncing) {
+          const px = this.player.x, py = this.player.y;
+          const left = px - this.player.halfW;
+          const right = px + this.player.halfW;
+          const top = py - this.player.halfH;
+          const bottom = py + this.player.halfH;
 
-        const overlapX = (right > next.x) && (left < next.x + next.w);
-        if (overlapX && this.collisionCooldown <= 0) {
-          const hitsTopBlock = top < next.gapTop;
-          const hitsBottomBlock = bottom > next.gapBottom;
+          const overlapX = (right > next.x) && (left < next.x + next.w);
+          if (overlapX && this.collisionCooldown <= 0) {
+            const hitsTopBlock = top < next.gapTop;
+            const hitsBottomBlock = bottom > next.gapBottom;
 
-          if (hitsTopBlock || hitsBottomBlock) {
-            this.bounceTimer = CONFIG.bounceDuration;
-            this.collisionCooldown = CONFIG.collisionCooldown;
-            this.bounceCount++;
+            if (hitsTopBlock || hitsBottomBlock) {
+              this.bounceTimer = CONFIG.bounceDuration;
+              this.collisionCooldown = CONFIG.collisionCooldown;
+              this.bounceCount++;
 
-            const need = SOLFEGE[next.lane].name;
-            if (this.player.targetLane < next.lane) this.bounceHintText = `Need ${need} (higher)`;
-            else if (this.player.targetLane > next.lane) this.bounceHintText = `Need ${need} (lower)`;
-            else this.bounceHintText = `Need ${need}`;
-            this.bounceHintTimer = 0.75;
+              const need = SOLFEGE[next.lane].name;
+              if (this.player.targetLane < next.lane) this.bounceHintText = `Need ${need} (higher)`;
+              else if (this.player.targetLane > next.lane) this.bounceHintText = `Need ${need} (lower)`;
+              else this.bounceHintText = `Need ${need}`;
+              this.bounceHintTimer = 0.75;
+            }
           }
         }
       }

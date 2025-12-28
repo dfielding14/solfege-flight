@@ -46,12 +46,24 @@ html, body {
   max-width: 960px;
   margin: 6vh auto 0 auto;
   padding: 20px 20px;
+  max-height: calc(100dvh - 10vh);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   backdrop-filter: blur(6px);
   animation: panelIn 320ms ease-out;
+}
+
+@supports not (height: 100dvh) {
+  .screen {
+    max-height: calc(100vh - 10vh);
+  }
 }
 
 .screen h1,
